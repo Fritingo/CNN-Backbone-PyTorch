@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from models import AlexNet
+from models import AlexNet, VGG
 
 def SetDevice():  
     if opt.device == '':
@@ -21,17 +21,20 @@ def SetDevice():
     return device
 
 def SetDataset():
-    if opt.data == 'cifa10':
+    if opt.data == 'cifa100':
         # transform
-        transform = transforms.Compose([transforms.ToTensor()]) # 0~255 -> 0~1  //-1~1 , transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transform = transforms.Compose([transforms.Resize(256),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                      ]) #transforms.Compose([transforms.ToTensor()]) # 0~255 -> 0~1  //-1~1 , transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 
         # load data
-        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-        testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+        trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform)
+        testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform)
         trainLoader = torch.utils.data.DataLoader(trainset, batch_size=16, shuffle=True)
         testLoader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
         classes = ('apple ', 'aquarium_fish ', 'baby ', 'bear ', 'beaver  ', 'bed ', 'bee ', 'beetle ', 'bicycle ', 'bottle ', 'bowl ', 'boy ', 'bridge ', 'bus ', 'butterfly ', 'camel ', 'can ', 'castle ', 'caterpillar ', 'cattle ', 'chair ', 'chimpanzee ', 'clock ', 'cloud ', 'cockroach ', 'couch ', 'cra ', 'crocodile ', 'cup ', 'dinosaur ', 'dolphin ', 'elephant ', 'flatfish ', 'forest ', 'fox ', 'girl ', 'hamster ', 'house ', 'kangaroo ', 'keyboard ', 'lamp ', 'lawn_mower ', 'leopard ', 'lion ', 'lizard ', 'lobster ', 'man ', 'maple_tree ', 'motorcycle ', 'mountain ', 'mouse ', 'mushroom ', 'oak_tree ', 'orange ', 'orchid ', 'otter ', 'palm_tree ', 'pear ', 'pickup_truck ', 'pine_tree ', 'plain ', 'plate ', 'poppy ', 'porcupine ', 'possum ', 'rabbit ', 'raccoon ', 'ray ', 'road ', 'rocket ', 'rose ', 'sea ', 'seal ', 'shark ', 'shrew ', 'skunk ', 'skyscraper ', 'snail ', 'snake ', 'spider ', 'squirrel ', 'streetcar ', 'sunflower ', 'sweet_pepper ', 'table ', 'tank ', 'telephone ', 'television ', 'tiger ', 'tractor ', 'train ', 'trout ', 'tulip ', 'turtle ', 'wardrobe ', 'whale ', 'willow_tree ', 'wolf ', 'woman ', 'worm')
-        print('training CIFA10')
+        print('training CIFA100')
         return trainLoader, testLoader, classes
     else:
         print('undone')
@@ -39,6 +42,10 @@ def SetDataset():
 def SetModel(device):
     if opt.model == 'AlexNet':
         return AlexNet.AlexNet().to(device)
+    elif opt.model == 'VGG16':
+        return VGG.VGG16().to(device)
+    elif opt.model == 'VGG19':
+        return VGG.VGG19().to(device)
 
 
 
@@ -46,7 +53,7 @@ def SetModel(device):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='')
-    parser.add_argument('--data', type=str, default='cifa10')
+    parser.add_argument('--data', type=str, default='cifa100')
     parser.add_argument('--model', type=str, default='AlexNet')
     opt = parser.parse_args()
 
@@ -57,10 +64,10 @@ if __name__ == '__main__':
     
     # set loss optimizer
     loss_fnc = nn.CrossEntropyLoss()
-    lr = 0.001
+    lr = 0.0001
     epochs = 100
     momentum = 0.9
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr) #optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
     # train
     for epoch in range(epochs):
@@ -83,26 +90,27 @@ if __name__ == '__main__':
 
             if times % 100 == 99 or times+1 == len(trainLoader):
                 print('[%d/%d, %d/%d] loss: %.3f' % (epoch+1, epochs, times+1, len(trainLoader), running_loss/times))
+        
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for data in testLoader:
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+                
+                outputs = model(inputs)
+                
+                _, predicted = torch.max(outputs.data, 1)
+                
+                total += 1
+                
+                correct += (predicted == labels)
+
+
+        print('Accuracy of Test Dataset: %d %%' % (100 * correct / total))
     
     print('Finished Training')
 
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for data in testLoader:
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            
-            outputs = model(inputs)
-            
-            _, predicted = torch.max(outputs.data, 1)
-            
-            total += 1
-            
-            correct += (predicted == labels)
-
-
-    print('Accuracy of the network on the 10000 test inputs: %d %%' % (100 * correct / total))
 
     class_correct = list(0. for i in range(100))
     class_total = list(0. for i in range(100))
@@ -122,4 +130,4 @@ if __name__ == '__main__':
     for i in range(100):
         print('Accuracy of %5s : %2d %%' % (classes[i], 100 * class_correct[i] / class_total[i]))
 
-    torch.save(model.state_dict(), "cifar100_AlexNet.pt")
+    torch.save(model.state_dict(), "weights/" + opt.data + "_" + opt.model + ".pt")

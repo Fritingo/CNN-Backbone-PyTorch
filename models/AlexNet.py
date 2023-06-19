@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 from thop import profile
 
+# 2293MiB 35 %
 class AlexNet(nn.Module):
-    def __init__(self, class_num=10):
+    def __init__(self, input_size=256, class_num=100):
         super(AlexNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, 11, stride=4, padding=2) # orignal is stride 4 kernel size 11 
         self.conv2 = nn.Conv2d(64, 192, 5, stride=4, padding=2)
@@ -16,15 +17,11 @@ class AlexNet(nn.Module):
 
         self.act = nn.ReLU()
 
-        
+        self.fc0 = nn.Linear(256*(input_size//128-1)*(input_size//128-1), 4096)
         self.fc1 = nn.Linear(4096, 1024)
         self.fc2 = nn.Linear(1024, class_num)
 
     def forward(self,x):
-        
-        x = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)(x) 
-        x = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)(x) 
-        x = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)(x) 
         
         x = self.act(self.conv1(x))
         x = self.maxpool(x)
@@ -38,8 +35,7 @@ class AlexNet(nn.Module):
         
         x = torch.flatten(x, start_dim=1)
         
-        fc0 = nn.Linear(x.size()[1], 4096)
-        x = self.act(fc0(x))
+        x = self.act(self.fc0(x))
         x = self.dropout(x)
         x = self.act(self.fc1(x))
         x = self.dropout(x)
@@ -48,8 +44,8 @@ class AlexNet(nn.Module):
         return x
     
 if __name__ == '__main__':
-    input = torch.randn(16, 3, 32, 32)
-    model = AlexNet()
+    input = torch.randn(16, 3, 256, 256)
+    model = AlexNet(256)
     y = model(input)
     print('output shape:', y.size())
 
