@@ -135,8 +135,8 @@ class VGG19(nn.Module):
         return x
     
 if __name__ == '__main__':
-    input = torch.randn(16, 3, 32, 32)
-    model = VGG19(32, 100)
+    input = torch.randn(32, 3, 32, 32)
+    model = VGG16(32, 100)
     y = model(input)
     print('output shape:', y.size())
 

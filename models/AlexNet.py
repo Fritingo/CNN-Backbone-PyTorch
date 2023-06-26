@@ -4,7 +4,7 @@ from thop import profile
 
 # 2293MiB 35 %
 class AlexNet(nn.Module):
-    def __init__(self, input_size=256, class_num=100):
+    def __init__(self, input_size=224, class_num=100):
         super(AlexNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, 11, stride=4, padding=2) # orignal is stride 4 kernel size 11 
         self.conv2 = nn.Conv2d(64, 192, 5, stride=4, padding=2)
@@ -17,7 +17,7 @@ class AlexNet(nn.Module):
 
         self.act = nn.ReLU()
 
-        self.fc0 = nn.Linear(256*(input_size//128-1)*(input_size//128-1), 4096)
+        self.fc0 = nn.Linear(256, 4096)
         self.fc1 = nn.Linear(4096, 1024)
         self.fc2 = nn.Linear(1024, class_num)
 
@@ -44,8 +44,8 @@ class AlexNet(nn.Module):
         return x
     
 if __name__ == '__main__':
-    input = torch.randn(16, 3, 256, 256)
-    model = AlexNet(256)
+    input = torch.randn(16, 3, 224, 224)
+    model = AlexNet(224)
     y = model(input)
     print('output shape:', y.size())
 
