@@ -34,9 +34,9 @@ def SetDataset():
                                       ]) #transforms.Compose([transforms.ToTensor()]) # 0~255 -> 0~1  //-1~1 , transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         
         data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform)
-        testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform)
-        
-        trainset, testset = torch.utils.data.random_split(data, [0.8, 0.2])
+        proportions = [.8, .2]
+        lengths = [int(p * len(data)) for p in proportions]
+        trainset, testset = torch.utils.data.random_split(data, lengths)
         trainLoader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True)
         testLoader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=True)
         

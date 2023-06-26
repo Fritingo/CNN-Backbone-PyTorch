@@ -15,20 +15,19 @@ from thop import profile
 class Block(nn.Module):
     #DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
 
-    def __init__(self, dim, drop_path=0.):
+    def __init__(self, dim, drop_path=0., norm_size=0):
         super().__init__()
         self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim) # depthwise conv
         self.pwconv1 = nn.Conv2d(dim, 4*dim, 1, stride=1, padding=0) # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
         self.pwconv2 = nn.Conv2d(4*dim, dim, 1, stride=1, padding=0)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        
+        self.norm = nn.LayerNorm(norm_size, eps=1e-6)
 
     def forward(self, x):
         input = x
         x = self.dwconv(x)
-        norm = nn.LayerNorm(x.size()[1:], eps=1e-6)
-        x = norm(x)
+        x = self.norm(x)
         x = self.pwconv1(x)
         x = self.act(x)
         x = self.pwconv2(x)
@@ -52,7 +51,7 @@ class ConvNeXt(nn.Module):
             norm_size  = out.size()[1:]
             norm_size_list.append(norm_size)
             for i in range(3):
-                norm_size_list.append([dims[i+1], norm_size[1]//(2*(i+1)), norm_size[2]//(2*(i+1))])
+                norm_size_list.append([dims[i+1], norm_size[1]//(2**(i+1)), norm_size[2]//(2**(i+1))])
 
         
         stem = nn.Sequential(
@@ -75,7 +74,7 @@ class ConvNeXt(nn.Module):
         cur = 0
         for i in range(4):
             stage = nn.Sequential(
-                *[Block(dim=dims[i], drop_path=dp_rates[cur + j]) for j in range(depths[i])]
+                *[Block(dim=dims[i], drop_path=dp_rates[cur + j], norm_size=norm_size_list[i]) for j in range(depths[i])]
             )
             self.stages.append(stage)
             cur += depths[i]
@@ -104,7 +103,7 @@ class ConvNeXt(nn.Module):
         return x
     
 
-def convnext_tiny(input_size=32, class_num=100, **kwargs):
+def convnext_tiny(input_size=224, class_num=100, **kwargs):
     model = ConvNeXt(input_size=input_size, class_num=class_num, depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
     return model
 
